@@ -1,0 +1,36 @@
+Remote machine restart:BUt need the same user to be available in both machines
+shutdown /r /m \\ca1vmrapid-scmbuild31 /t 0
+
+shutdown /r /m \\scmbuild19 /t 0
+System hangs no UI and only cmd accessible follow below 2 steps :
+taskkill /f /im explorer.exe
+start explorer.exe
+
+Know key for visual studio 
+Computer\HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\12.0\Registration\2000.0x0000
+
+Env registry path:
+Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment
+
+.net 3.5 issue 
+dism /online /Cleanup-Image /RestoreHealth
+
+self extracting exe creation from cmd line with 7zip
+
+"C:\Program Files\7-Zip\7z.exe" a archive.exe -mmt -mx5 -sfx7z.sfx dirname
+
+https://stackoverflow.com/questions/60313654/puppet-duplicate-declaration-for-registry-key
+
+ca1vmllsqe310-Jenkins server
+
+Installshield 2020 repair command :with GUID url:https://www.advancedinstaller.com/user-guide/msiexec.html
+msiexec.exe /qn /fa {E429FA87-5DCA-48A4-B745-731CFB77E0AD}
+
+get all installed application GUID in powershell:
+get-wmiobject Win32_Product | Format-Table IdentifyingNumber, Name, LocalPackage -AutoSize
+
+Disable lockscreen in win10 :
+HKEYLOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\7516b95f-f776-4464-8c53-06167f40cc99\8EC4B3A5-6868-48c2-BE75-4F3044BE88A7
+attributes :value2
+
+vstest.console.exe KLATencor.CougarToPhoenixAdapter.UnitTests.dll /settings:CAUnitTests.runsettings /InIsolation /Logger:trx  1>>D:\CI_Log_data\CI_Flashscan_CougarAdapter\26\UnitTest.log

@@ -1,0 +1,215 @@
+<scriptlet>
+<comment>
+  PatchConsole is a progress or status dialog window, intended
+  to keep a user informed about the progress made by a running
+  patch installation script...
+</comment>
+
+<Registration ProgID="PatchConsole.Scriptlet"/>
+
+<implements id=Automation type=Automation>
+
+   <method name=Open internalname=OpenIE>
+      <PARAMETER name=sTitle/>
+      <PARAMETER name=pLeft/>
+      <PARAMETER name=pTop/>
+      <PARAMETER name=pWidth/>
+      <PARAMETER name=pHeight/>
+   </method>
+
+   <method name=Close>
+
+   </method>
+   
+   <method name=Show>
+      <PARAMETER name=bVisible/>
+   </method>
+
+   <property name=SetLine1>
+      <put/>
+   </property>
+
+   <property name=SetLine2>
+      <put/>
+   </property>
+
+   <property name=PctComplete>
+      <put/>
+   </property>
+
+</implements>
+
+<implements id="PatchConsole" type="Event">   
+   <event name="OnUnLoad" />
+</implements>
+
+
+<script language=VBScript>
+
+Option Explicit
+    
+' --- module level variables ---
+Dim oIE, oDlg, oCallAPI  ' as object
+Dim m_Title  ' as string (form caption)
+Dim m_wdDlg  ' as long (holds the width of this dialog)
+Dim oTxt1, oTxt2  ' as object
+'
+Dim bEvent  ' as boolean
+Dim sEvent  ' as string
+'
+Const bShowMenu = FALSE
+'
+Dim sLine1  ' as string
+Dim sUpdate(10) ' as string
+'
+Dim iPct, sPct, wdBar, pxBar  ' as long
+' --- end of module level variables ---
+
+Function OpenIE(sTitle, pLeft,pTop, pWidth,pHeight)
+
+  m_Title = sTitle & String(65,Chr(160))
+  m_wdDlg = pWidth  ' save for later
+
+  ' --- instantiate internetexplorer -------------  
+  Set oIE = CreateObject("InternetExplorer.Application")
+  oIE.left      = pLeft
+  oIE.top       = pTop
+  oIE.width     = pWidth
+  oIE.height    = pHeight
+  oIE.menubar   = bShowMenu
+  oIE.toolbar   = bShowMenu
+  oIE.statusbar = bShowMenu
+  oIE.Resizable = False
+  oIE.navigate("about:blank")
+
+  while oIE.Busy: Wend  ' wait for page to load...
+
+  ' set width of bar = 3/4 x width of dialog...
+  wdBar = 0.75 * pWidth
+  
+  ' --- load html into the oIE.document -----------
+  set oDlg = oIE.document
+  
+  Call Write_HTML_ToDialog(oDlg)
+
+  ' with ie/html loaded, define assorted objects...
+  set oTxt1 = oDlg.all("txtMsg")
+  set oTxt2 = oDlg.all("txtRemarks")
+
+  ' tell IE about event handlers...
+  oDlg.body.OnUnLoad = GetRef("oDlg_OnUnLoad")
+  
+
+  ' set up the message area (default)...
+  sLine1 = "Welcome to Patch Installation"
+  oTxt1.innerTEXT = sLine1
+  oTxt2.innerTEXT = ""
+
+End Function
+
+Function Close()
+  oIE.quit
+End Function 
+
+Function Show(bVisible)
+  oIE.Visible = bVisible
+End Function
+
+Function put_SetLine1(sNewText)
+  oTxt1.innerTEXT = sNewText
+End Function
+
+Function put_SetLine2(sNewText)
+  oTxt2.innerTEXT = sNewText
+End Function
+
+Function put_PctComplete(nPct)
+
+  ' check if user clicked "Cancel"
+
+  if  sEvent = "OnUnLoad"  then  
+      PatchConsole.fireEvent("OnUnLoad")
+      Exit Function  ' no need to go on...
+      End If 
+
+  ' do not use caption any more (ims# 3340762730)
+  ' fill in pct complete...
+  ' On Error Resume Next
+  ' oDLG.pbText.caption = CStr(nPct) & "% Complete"
+  ' On Error goto 0
+
+  ' and reshape the size to reflect pct...
+  pxBar = CLng((nPct/100) * wdBar) ' progbar pixels = pct times wdBar...
+  oDLG.all.ProgBar.Style.width = CStr(pxBar)
+
+End Function
+
+
+' ---- EVENT HANDLERS ----------------------------
+
+
+
+Sub oDlg_OnUnLoad
+  sEvent = "OnUnLoad"
+End Sub
+
+
+' --- EXIT THIS SCRIPT ---------------------------
+
+Sub ExThisScript
+  oIE.quit  ' shut down IE...
+  Set oIE = nothing  ' destroy instance
+  Wscript.Quit   ' exit this wsh script
+end sub
+
+
+' --- WRITE HTML INTO THE OPEN DOC ---------------
+
+Sub Write_HTML_ToDialog(oDlg)
+
+  oDlg.Open "", CStr("myWindow")  ' open doc for writing, and give it a name
+
+  oDlg.Write "<html><head><title> " & m_Title & " </title></head> " & vbCrLf _
+           & "<body Name='docBody'  bgcolor='Silver' text='white', scroll=no>" _
+           & "<font size='2' face='Verdana' color='navy' >" & vbCrLf
+
+  oDlg.Write "<p ID='txtMsg' > </p>" & vbCrLf _
+           & "<p ID='txtRemarks' > </p> " 
+
+  ' write out the progress bar, 
+  Call WriteProgressBar(oDLG, 40, 80, wdBar, 20)
+  
+
+End Sub  
+
+' --- WRITE THE PROGRESS BAR INTO THE DIALOG -----
+
+Sub WriteProgressBar(oDlg, pxLeft, pxTop, pxWidth, pxHeight)
+Dim pxText  ' as long
+Dim sLeftTop  ' as string (a common position)
+
+  ' center the text...
+  pxText = pxLeft + (pxWidth \ 2) - 50
+
+  ' do not use caption any more (ims# 3340762730)
+  ' oDlg.Write "<OBJECT ID=""pbText"" " & vbCrLf _
+  '         & "  style= 'position: absolute; left: " & CStr(pxText) & "; top: " & CStr(pxTop+3) & "; width: 200; height: 20; z-index: 1; ' " & vbCrLf _
+  '         & "  CLASSID=""CLSID:978C9E23-D4B0-11CE-BF2D-00AA003F40D0"" > " & vbCrLf _
+  '         & "  <PARAM NAME='ForeColor' VALUE='16777215'> "  & vbCrLf _
+  '         & "  <PARAM NAME='VariousPropertyBits' VALUE='8388627' > "  & vbCrLf _
+  '         & "  <PARAM NAME='FontName' VALUE='Fixedsys' > "  & vbCrLf _
+  '         & "</OBJECT><BR><BR>"  & vbCrLf 
+           
+  sLeftTop = "left: " & CStr(pxLeft) & "; top: " & CStr(pxTop)
+
+  oDlg.Write "<p ID='ProgBar' style='background: navy; color: black; " _
+           & " position: absolute; " & sLeftTop & "; width: 0; height: " & CStr(pxHeight) & "; z-index: 0; '>" & vbCrLf _
+           & " </p>" & vbCrLf  ' null for text in this element...
+
+  oDlg.Write "<p> <input type=Text Name='pbFrame' style='background: silver; " _
+           & " position: absolute; " & sLeftTop & "; width: " & CStr(pxWidth) & "; z-index: -1; ' > </p>" & vbCrLf 
+
+End Sub
+
+</script>
+</scriptlet>

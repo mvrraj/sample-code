@@ -1,0 +1,51 @@
+﻿Date: 09/28/2020
+Release: 1.0.034H
+Patch No.: 1.0.034H_01
+Total files:7
+--------------------------------------------------------------------------------
+Patch Install Procedure:
+--------------------------------------------------------------------------------
+1. Go to <Patch_Release_Location>\Patch_to_Install
+2. Click on Setup.vbs
+3. Click "Yes" on the welcome window.
+4. In the Patch Installation window, Enter\Browse the Full build installation location without the build number.
+   eg: If build is installed @ D:\KTInsptr\1.0.034H, Enter the location upto D:\KTInsptr
+5. Click "Ok"
+5. Once the installation is completed click "Ok" on the completion window.
+
+
+-----------------------------------------------------------------
+Summary: 
+-----------------------------------------------------------------
+This patch addresses the following:
+
+Patch 1.0.034H_01
+
+1. Under Sizing Issue (e.g. 15um in real ? 700nm sizing by Flash Scan). Small R,Small TE and Small DSize Value Range defined in SizingManipulator.txt
+2. Size will be replaced by DSize based on R,TE and Dsize configured in SizingManipulator.txt
+3. Over Sizing Issue (e.g. FLD 88888 nm sizing by Flash Scan) - Default LPM defect size will be replaced by value configured in SizingManipulator.txt
+4. Huge or Small P Values of edge medium defects are normalized to the nearest TE matching valid P values 
+5.      SizingPValueManipulator.txt should be provided with huge and Small P value to be considered.
+6. To disable this feature rename or delete SizingPValueManipulator.txt
+7. 24541-Unable to run MultiReticleLoadUnloadViaFlipperCycleTest for LP2.
+8. 25363-script to cycle Chuck clamping motion.
+9. 25386-Pattern Inspection failed while getting TotalEnergyValue from FlexibleDefectDF structure during run in simulator.
+10. 25480-Grading configuration doesn't reset to default settings when clicking default button
+-----------------------------------------------------------------------------------
+Copy From:
+1. SizingManipulator.txt
+2. SizingPValueManipulator.txt
+3. WaferTestSharedGUI.py
+4. MultiReticleLoadUnloadViaFlipperCycleTest.py
+5. ClampsTest.py
+6. imc.jar
+7. KLATencor.RoadRunner.PF.BLIF.Analysis.Controls.Extensions.dll
+
+Copy To:
+1. <INSTALLATIONDIR>\1.0.034H\MainUI\bin
+2. <INSTALLATIONDIR>\1.0.034H\MainUI\bin
+3. <INSTALLATIONDIR>\1.0.034H\Cougar\DiagnosticScripts\utilities\
+4. <INSTALLATIONDIR>\1.0.034H\Cougar\DiagnosticScripts\CycleTests\
+5. <INSTALLATIONDIR>\1.0.034H\Cougar\DiagnosticScripts\Stage\
+6. <INSTALLATIONDIR>\1.0.034H\Cougar\JarZipFiles\
+7. <INSTALLATIONDIR>\1.0.034H\MainUI\bin

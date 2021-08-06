@@ -1,0 +1,301 @@
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' UninstallPatch.vbs
+'
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Option Explicit
+
+' --- some handy global variables ---
+Public oPD ' console object
+Dim scount, count ' src/dst counter
+Dim srcfiles( 775 ), dstfiles( 775 ) ' src and dst list
+Dim WhatToDo, CRLF, productName, IsConsoleOpen, readme ' my own stuff
+Const For_Writing = 2
+Const ForReading = 1
+Dim objFSO,myLog,patch_no,prodNum,patchDir,FSO,Source,Destination,dirlet
+Set objFSO = CreateObject("Scripting.FileSystemObject")
+readme = "patchinfo.txt"
+patchDir ="Patch"
+
+' --- product name for branding ---
+productName = "FlashScan_1.0.034H_01"
+
+CRLF = Chr( 13 ) & Chr( 10 )
+IsConsoleOpen = False
+
+Sub UninstallPatch()
+	' --- open console window ---
+	On Error Resume Next
+	Call OpenConsole( "Uninstalling patch ..." )
+   	BugAssert ( Err.Number = 0 ), "OpenConsole Failed."
+	On Error goto 0
+
+	' --- parse and validate plist file ---
+	On Error Resume Next
+	Call ParsePatchListFile()
+   	BugAssert ( Err.Number = 0 ), "ParsePatchListFile Failed."
+	On Error goto 0
+
+	' --- undo patch ---
+	On Error Resume Next
+	Call UndoPatch()
+   	BugAssert ( Err.Number = 0 ), "UndoPatch Failed."
+	On Error goto 0
+	
+	'--- Cougar Adapter services start after uninstallation. -----
+	call StartService()
+	
+	' --- close console window ---
+	Call CloseConsole()
+	MsgBox CStr( count ) & " files were restored. ", 64, productName & " Patch UnInstallation"
+	myLog.WriteLine(Now &" Patch Uninstallation Completed Sucessfully...")
+	Set FSO = CreateObject("Scripting.FileSystemObject")
+	Source=( "C:\Windows\Temp\"& patchDir&"_uninstall_"&patch_no&"_"&dt&".log " )
+	dirlet = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(WScript.ScriptFullName)))
+	Destination= dirlet &"\Install_Logs\"& prodNum &"\"
+	FSO.CopyFile Source,Destination
+End Sub
+
+Sub ParsePatchListFile()
+	Dim fso, ts, tl, temp, plist
+
+	oPD.SetLine2 = "Processing readme file, please wait..."
+	myLog.WriteLine("-------Processing readme file, please wait -------")
+
+	' --- prepare initial values for parsing plist file ---
+	scount = 0
+	Const ForReading = 1
+	plist = "patch" & Chr(92) & "plist"
+
+	' --- open and start parsing plist file ---
+	Set fso = CreateObject ("Scripting.FileSystemObject")
+
+	If Not fso.FileExists (plist) Then
+		BugAssert 0, plist & " file doesn't exist."
+	End If
+	Set ts = fso.OpenTextFile(plist, ForReading)
+
+	Do While ts.AtEndOfStream <> True
+		tl = ts.ReadLine
+		tl = Trim(tl)
+		If Not (tl = "") Then
+			temp = Split(tl, ";", -1, 1)
+			srcfiles(scount) = temp(0)
+			dstfiles(scount) = temp(1)
+			scount = scount + 1
+		End If
+	Loop
+	ts.Close
+
+	oPD.SetLine2 = " "
+	myLog.writeline("--------Processing plist file completed--------")
+End Sub
+
+Sub UndoPatch()
+	Dim fso, patch, backup, I, junk, deletecount
+
+	Set fso = CreateObject( "Scripting.FileSystemObject" )
+	count = 0
+	deletecount = 0
+        ' walk through patch list file ---
+	For I = 0 To scount-1
+		patch = srcfiles( I )
+
+		' --- if backup file exists, create original file ---
+		If ( fso.FileExists( dstfiles( I ) & Chr( 92 ) & patch & ".keep" ) ) Then
+			Set backup = fso.GetFile( dstfiles( I ) & Chr( 92 ) & patch & ".keep" )
+			' --- if patched file exists, destroy it ---
+			If ( fso.FileExists( dstfiles( I ) & Chr( 92 ) & patch ) ) Then
+				junk = dstfiles( I ) & Chr( 92 ) & patch
+				fso.DeleteFile junk, True
+			End If
+			' --- create original file ---
+			backup.Move( dstfiles( I ) & Chr( 92 ) & patch )
+			count = count + 1
+		Else 
+			Set backup = fso.GetFile(dstfiles( I ) & Chr( 92 ) & patch)
+	        fso.DeleteFile backup, True
+			deletecount = deletecount + 1
+			'-delete the .patch file ----created to identify new files created by patches-----
+			If ( fso.FileExists( dstfiles( I ) & Chr( 92 ) & patch & ".patch" ) ) Then
+				junk = dstfiles( I ) & Chr( 92 ) & patch & ".patch"
+				fso.DeleteFile junk, True
+			End If
+			
+		End If
+
+		oPD.SetLine2 = " " & patch & " ..."
+		oPD.PctComplete = Int( ( 100/scount ) * ( I+1 ) )
+		myLog.WriteLine(Now &" File Uninstalled : "  & dstfiles( I ) & Chr( 92 ) & srcfiles( I )) 
+
+	        WScript.Sleep 200
+	Next
+
+	' --- cleanup patch folder ---
+	If fso.FolderExists( "patch" ) Then
+		fso.DeleteFolder "patch", True
+	End If
+	If fso.FileExists( "patchinfo.txt" ) Then
+		fso.DeleteFile "patchinfo.txt", True
+	End If
+	If fso.FileExists( "PatchConsole.wsc" ) Then
+		fso.DeleteFile "PatchConsole.wsc", True
+	End If
+	If fso.FileExists( "UninstallPatch.vbs" ) Then
+		fso.DeleteFile "UninstallPatch.vbs", True
+	End If
+	myLog.WriteLine("*************Cleanup of Patch folder Completed**********")
+	oPD.SetLine2 = " "
+	oPD.SetLine2 = "Done! " & CStr( count ) & " files were restored."
+	oPD.SetLine2 = " "
+	oPD.SetLine2 = CStr( deletecount ) & " files were deleted."
+	WScript.Sleep 2000 ' one second
+	myLog.WriteLine(Now & " Done! " & CStr( count ) & " files were restored.")
+	myLog.WriteLine(Now & "  "& CStr( deletecount ) & " files were deleted.")
+End Sub
+
+Sub OpenConsole( strTask )
+	Dim WshShell
+
+	' --- prepare console window ---
+	Set WshShell = WScript.CreateObject( "WScript.Shell" )
+	WshShell.Run "regsvr32 /s PatchConsole.wsc", 1, true
+	' --- initiate console window ---
+	Set oPD = WScript.CreateObject( "PatchConsole.Scriptlet", "oPD_" )
+	If ( IsObject( oPD ) = FALSE ) Then
+		BugAssert 0, "Instantiate PatchConsole Failed."
+	End If
+	' --- create the form, and add the controls ---
+	oPD.Open productName & " Patch UnInstallation", 60, 100, 400, 200
+	oPD.Show TRUE
+	oPD.SetLine1 = strTask
+	oPD.SetLine2 = " "
+  	' --- finished with creating the form ---
+	IsConsoleOpen = True
+End Sub
+
+Sub CloseConsole()
+	Dim WshShell
+
+	' --- destroy the form ---
+	oPD.Close  ' clean up
+	Set oPD = Nothing
+	IsConsoleOpen = False
+	' --- clean up console window ---
+	Set WshShell = WScript.CreateObject( "WScript.Shell" )
+	WshShell.Run "regsvr32 /u /s PatchConsole.wsc", 1, true
+End Sub
+
+Sub oPD_Cancel()
+	Call CloseConsole()
+	BugAssert 0, "Patch Installation CANCELLED."
+End Sub
+
+Sub oPD_OnUnLoad()
+	Set oPD = Nothing
+	' --- clean up console window ---
+	Set WshShell = WScript.CreateObject( "WScript.Shell" )
+	WshShell.Run "regsvr32 /u /s PatchConsole.wsc", 1, true
+End Sub
+
+Sub BugAssert( bTest, sErrMsg )
+	If bTest Then Exit Sub
+
+	If ( Err.Number =0 ) Then
+		MsgBox "Error: " & sErrMsg & CRLF & CRLF, vbCritical, productName & " Patch UnInstallation"
+		myLog.WriteLine(Now & " Error: " & sErrMsg & CRLF & CRLF & vbCritical & productName & " Patch UnInstallation")
+	Else
+		MsgBox "Error: " & sErrMsg & CRLF & CRLF & "Error#: " & CStr( Err.Number ) & ", " & Err.Description & CRLF & CRLF,_
+			vbCritical, productName & " Patch UnInstallation"
+		myLog.WriteLine(Now & " Error: " & sErrMsg & CRLF & CRLF & " Error#: " & CStr( Err.Number ) & ", " & Err.Description & CRLF & CRLF &_
+		vbCritical & productName & " Patch UnInstallation")
+	End If
+
+	If ( IsConsoleOpen ) Then
+		Call CloseConsole()
+	End If
+
+  	WScript.Quit
+End Sub
+
+sub StopService()
+	Dim objWMIService, objService,sTargetSvc,strService,strComputer,colListOfServices
+	strService = Array("Cougar to Phoenix Adapter Service","Cougar Adapter ActiveMQ")
+	Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+	For Each sTargetSvc In strService
+		myLog.WriteLine(Now & "Current State of :: "& sTargetSvc & " :: to Stopped"  )	
+		Set colListOfServices = objWMIService.ExecQuery ("Select * from Win32_Service Where DisplayName='"& sTargetSvc & "'")
+		For Each objService in colListOfServices
+			If LCase(objService.Name) = LCase(sTargetSvc) Then
+				If objService.State <> "Stopped" Then
+					' WScript.Echo "Current State of :: "& sTargetSvc & " :: "& objService.State  
+					objService.StopService()
+				End If 
+			End If  
+		Next
+	Next
+End Sub
+
+sub StartService()
+	Dim objWMIService, objService,sTargetSvc,strService,strComputer,colListOfServices
+	strService = Array("Cougar to Phoenix Adapter Service","Cougar Adapter ActiveMQ")
+	Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+	For Each sTargetSvc In strService
+		myLog.WriteLine(Now & "Current State of :: "& sTargetSvc & " :: to Running"  )	
+		Set colListOfServices = objWMIService.ExecQuery ("Select * from Win32_Service Where DisplayName='"& sTargetSvc & "'")
+		For Each objService in colListOfServices
+			If LCase(objService.Name) = LCase(sTargetSvc) Then
+				If objService.State <> "Running" Then
+					' WScript.Echo "Current State of :: "& sTargetSvc & " :: "& objService.State  
+					objService.StartService()
+				End If 
+			End If  
+		Next
+	Next
+End sub
+
+Sub Readdata()
+Dim ts,tl,temp
+Set ts = objFSO.OpenTextFile( readme, ForReading )
+	Do While ts.AtEndOfStream <> True
+		tl = ts.ReadLine
+		tl = Trim( tl )
+		If InStr( 1, tl, "Release:", 1) Then
+			temp = Split( tl, ": ", -1, 1 )
+			prodNum = temp( 1 )
+			
+		End If
+		If InStr( 1, tl, "Patch No.:", 1) Then
+			temp = Split( tl, ": ", -1, 1 )
+			patch_no = temp( 1 )
+			
+		End If
+	Loop
+	ts.Close
+
+End Sub
+
+' --- main program ---
+
+WhatToDo = MsgBox( "Welcome to " & productName & " Patch Uninstaller! Do you want to Uninstall this Patch?", 68, productName & " Patch UnInstallation" )
+call Readdata()
+Dim dt
+dt=Replace(Now,"/","_")
+dt=Replace(dt,":","_")
+dt=Replace(dt," ","_")
+
+Set myLog = objFSO.CreateTextFile( "C:\Windows\Temp\"& patchDir&"_uninstall_"&patch_no&"_"&dt&".log " )
+myLog.WriteLine "****************    PATCH UNINSTALLATION LOG   ******************"
+myLog.WriteLine(Now & " Patch Uninstallation process started.")
+myLog.WriteLine(Now & " Build Number : "& prodNum)
+myLog.WriteLine(Now & " Patch Number : "& patch_no)
+
+'--- Cougar Adapter services stop before uninstallation. -----
+call StopService()
+
+Select Case WhatToDo
+	Case "6"
+		Call UninstallPatch()
+	Case "7"
+		WScript.Quit
+End Select
